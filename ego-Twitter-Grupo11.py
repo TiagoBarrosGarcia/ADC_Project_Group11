@@ -1,82 +1,47 @@
-# File path: twitter_analysis_optimized.py
-
 import networkx as nx
-import matplotlib.pyplot as plt
-from collections import Counter
-import random
 
-# Load a sampled dataset
-def load_sampled_twitter_data(file_path, sample_edges=100000):
-    G = nx.Graph()
-    with open(file_path, 'r') as f:
-        for i, line in enumerate(f):
-            if i >= sample_edges:
-                break  # Stop reading after reaching the sample size
-            edge = line.strip().split()
-            if len(edge) == 2:
-                G.add_edge(edge[0], edge[1])
-    return G
+# Load the dataset
+file_path = "twitter_combined.txt"  
+G = nx.read_edgelist(file_path)
 
-# Create subset of the graph
-def create_graph_subset(G, degree_threshold=50):
-    # Filter nodes based on degree threshold
-    nodes_subset = [node for node, degree in dict(G.degree()).items() if degree > degree_threshold]
-    subset_G = G.subgraph(nodes_subset)
-    return subset_G
+# Subset the graph based on degree threshold
+degree_threshold = 50
+subset_nodes = [node for node, degree in dict(G.degree()).items() if degree > degree_threshold]
+subset_G = G.subgraph(subset_nodes)
 
-# Approximate analysis of graph statistics
-def analyze_graph_approx(G):
-    stats = {
-        "num_nodes": G.number_of_nodes(),
-        "num_edges": G.number_of_edges(),
-        "average_clustering_coefficient": nx.average_clustering(G),
-        "approx_diameter": nx.approximation.diameter(G) if nx.is_connected(G) else "Graph not connected",
-        "largest_connected_component_size": len(max(nx.connected_components(G), key=len)),
-        "degree_distribution": Counter(dict(G.degree()).values()),
-    }
-    return stats
+# Compute metrics for the subset
+subset_metrics = {
+    "Nodes": subset_G.number_of_nodes(),
+    "Edges": subset_G.number_of_edges(),
+    "Nodes in largest WCC": len(max(nx.connected_components(subset_G), key=len)),
+    "Edges in largest WCC": subset_G.subgraph(max(nx.connected_components(subset_G), key=len)).number_of_edges(),
+    "Average clustering coefficient": nx.average_clustering(subset_G),
+    "Number of triangles": sum(nx.triangles(subset_G).values()) // 3,
+    "Fraction of closed triangles": nx.transitivity(subset_G),
+    "Diameter": nx.diameter(subset_G) if nx.is_connected(subset_G) else "Graph not connected",
+    "90-percentile effective diameter": nx.diameter(subset_G) * 0.9 if nx.is_connected(subset_G) else "N/A",
+}
 
-# Visualize degree distribution
-def plot_degree_distribution(degree_distribution, title="Degree Distribution"):
-    degrees = list(degree_distribution.keys())
-    counts = list(degree_distribution.values())
-    plt.figure(figsize=(8, 6))
-    plt.bar(degrees, counts, width=0.80, color='b')
-    plt.title(title)
-    plt.xlabel("Degree")
-    plt.ylabel("Frequency")
-    plt.show()
+# Output the subset metrics
+print("Subset Metrics:")
+for key, value in subset_metrics.items():
+    print(f"{key}: {value}")
 
-# Main function
-def main():
-    # File path
-    file_path = 'twitter_combined.txt'
-    sample_size = 100000  # Number of edges to sample
-    degree_threshold = 50  # Subset criteria
-    
-    # Load a sampled dataset
-    print(f"Loading a sample of {sample_size} edges from the dataset...")
-    G = load_sampled_twitter_data(file_path, sample_edges=sample_size)
-    print(f"Sampled graph loaded: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
-    
-    # Create subset
-    print(f"Creating a subset of nodes with degree > {degree_threshold}...")
-    subset_G = create_graph_subset(G, degree_threshold=degree_threshold)
-    print(f"Subset created: {subset_G.number_of_nodes()} nodes, {subset_G.number_of_edges()} edges")
-    
-    # Analyze sampled graph and subset
-    print("Analyzing sampled graph...")
-    sampled_graph_stats = analyze_graph_approx(G)
-    print("Analyzing subset graph...")
-    subset_graph_stats = analyze_graph_approx(subset_G)
-    
-    # Print stats
-    print("Sampled Graph Stats:", sampled_graph_stats)
-    print("Subset Graph Stats:", subset_graph_stats)
-    
-    # Visualize degree distribution
-    plot_degree_distribution(sampled_graph_stats["degree_distribution"], "Sampled Graph Degree Distribution")
-    plot_degree_distribution(subset_graph_stats["degree_distribution"], "Subset Graph Degree Distribution")
+# Add comparison logic here if needed, comparing with manually-entered full dataset values
+full_dataset_metrics = {
+    "Nodes": 81306,
+    "Edges": 1768149,
+    "Nodes in largest WCC": 81306,
+    "Edges in largest WCC": 1768149,
+    "Average clustering coefficient": 0.5653,
+    "Number of triangles": 13082506,
+    "Fraction of closed triangles": 0.06415,
+    "Diameter": 7,
+    "90-percentile effective diameter": 4.5,
+}
 
-if __name__ == "__main__":
-    main()
+print("\nComparison with Full Dataset:")
+for key in full_dataset_metrics:
+    subset_value = subset_metrics.get(key, "N/A")
+    full_value = full_dataset_metrics[key]
+    print(f"{key}: Subset = {subset_value}, Full Dataset = {full_value}")
